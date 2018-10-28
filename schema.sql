@@ -1,5 +1,3 @@
--- COMP9311 16s1 Project 2 2  Schema
---
 -- MyMyUNSW Schema
 
 -- ShortStrings are typically used for values appearing in tables in the UI
@@ -91,25 +89,6 @@ create table Rooms (
 	primary key (id)
 );
 
-
--- Facilities: things in rooms (e.g. data projector, OHP, etc.)
-
-create table Facilities (
-	id          integer, -- PG: serial
-	description MediumString not null,
-	primary key (id)
-);
-
-
--- Room_facilities: which facilities are available in which rooms
-
-create table Room_facilities (
-	room        integer references Rooms(id),
-	facility    integer references Facilities(id),
-	primary key (room,facility)
-);
-
-
 -- OrgUnit_types: kinds of organisational units at UNSW
 -- notes:
 --   examples: 'Faculty', 'School', 'Division',...
@@ -173,21 +152,6 @@ create table Semesters (
 	census      date, -- last date to withdraw without paying for course
 	primary key (id)
 );
-
-
--- Public_holidays: days when regular teaching is cancelled
--- These could be done as WholeDay/OneOff Events, but they would also
---   need to generate exceptions for all of the Class Events scheduled
---   on those days
--- Notice that there's no primary key; there could be several holidays
---   (e.g. different religions) on the same date
-
-create table Public_holidays (
-	semester    integer references Semesters(id),
-	description MediumString, -- e.g. Good Friday, Easter Day
-	day         date
-);
-
 
 -- Staff_roles: roles for staff within the UNSW organisation
 -- handles job classes under which staff are employed
@@ -388,16 +352,6 @@ create table Program_degrees (
 );
 
 
--- Degrees_awarded: info about student being awarded a degree
-
-create table Degrees_awarded (
-	student     integer references Students(id),
-	program     integer references Programs(id),
-	graduated   date,	
-	primary key (student,program)
-);
-
-
 -- Academic_standing: kinds of academic standing at UNSW
 -- e.g. 'good', 'probation1', 'probation2',...
 -- An enumerated-type table
@@ -466,20 +420,6 @@ create table Course_staff (
 	primary key (course,staff,role)
 );
 
-
--- Course_quotas: quotas for various classes of students in a course
--- if there's no quota, there's no entry in this table
--- alternatively, we could have allowed quota to be null
---   and used that as a mechanism for indicating "no quota"
-
-create table Course_quotas (
-	course      integer references Courses(id),
-	sgroup      integer references Student_groups(id),
-	quota       integer not null,
-	primary key (course,sgroup)
-);
-
-
 -- Program_enrolments: student's enrolment in a program in one semester
 -- notes:
 --   "standing" refers to the students academic standing
@@ -508,7 +448,7 @@ create table Stream_enrolments (
 
 
 -- Course_enrolments: student's enrolment in a course offering
--- null grade means "currently enrolled"
+-- null grade means "currently enrolled"pgs 
 -- if course is graded SY/FL, then mark always remains null
 
 create table Course_enrolments (
@@ -518,46 +458,6 @@ create table Course_enrolments (
 	grade       GradeType,
 	stuEval     integer check (stuEval >= 1 and stuEval <= 6),
 	primary key (student,course)
-);
-
-
--- Course_enrolment_waitlist: waiting lists for course enrolment
--- entries only stay on this list until students are enrolled,
---   and then they are deleted
--- the "applied" date is used as the basis for FIFO
---   allocation of places
-
-create table Course_enrolment_waitlist (
-	student     integer references Students(id),
-	course      integer references Courses(id),
-	applied     timestamp not null,
-	primary key (student,course)
-);
-
-
--- Books: textbook details
-
-create table Books (
-	id          integer, -- PG: serial
-	isbn        varchar(20) unique,
-	title       LongString not null,
-	authors     LongString not null,
-	publisher   LongString not null,
-	edition     integer,
-	pubYear     integer not null check (pubYear > 1900),
-	primary key (id)
-);
-
-
--- Course_books: relates books to courses
--- books are related to a Course rather than a Subject because texts
---   may change over time, even if the syllabus remains constant
-
-create table Course_books (
-	course      integer references Courses(id),
-	book        integer references Books(id),
-	bktype      varchar(10) not null check (bktype in ('Text','Reference')),
-	primary key (course,book)
 );
 
 
@@ -597,40 +497,7 @@ create table Classes (
 	primary key (id)
 );
 
-
--- Class_teachers: who teaches which class
--- unfortunately, no way to describe how two staff who
---   are allocated to a given class teach together
---   e.g. teach on alternating weeks
-
-create table Class_teachers (
-	class       integer references Classes(id),
-	teacher     integer references Staff(id),
-	primary key (class,teacher)
-);
-
-
--- Class_enrolments: one student's enrolment in a class
-
-create table Class_enrolments (
-	student     integer references Students(id),
-	class       integer references Classes(id),
-	primary key (student,class)
-);
-
-
--- Class_enrolment_waitlist: waiting lists for class enrolment
-
-create table Class_enrolment_waitlist (
-	student     integer references Students(id),
-	class       integer references Classes(id),
-	applied     timestamp not null,
-	primary key (student,class)
-);
-
-
--- External_subjects: represents
-from other institutions
+-- External_subjects: represents courses from other institutions
 -- used to ensure consistency in awarding advanced standing
 -- if student X gets advanced standing based on course Y at Z,
 --   then a later student who has done course Y at Z can be given
@@ -651,7 +518,6 @@ create table External_subjects (
 --	created     date not null,
 	primary key (id)
 );
-
 
 -- Variations: replacement of one subject or another in a program
 -- handles several cases (which are more or less similar):
